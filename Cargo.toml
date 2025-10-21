@@ -1,0 +1,13 @@
+[package]
+name = "vulkan-renderer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+vulkano = "*"
+glam = "0.29"
+image = "0.25"
+
+[profile.release]
+opt-level = 3
+lto = true
