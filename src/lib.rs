@@ -15,6 +15,13 @@ pub struct VulkanRenderer {}
 
 impl VulkanRenderer {
     pub fn init() -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(VulkanRenderer {})
+    }
+
+    /*
+    TODO: Make setup take in window information to actually set up Vulkan for the window.
+    */
+    pub fn setup(&self) -> Result<(), Box<dyn std::error::Error>> {
         // The InstanceCreateFlags::ENUMERATE_PORTABILITY flag is set to support devices, such as those on MacOS and iOS systems, that do not fully conform to the Vulkan Specification
         let library = VulkanLibrary::new()?;
         let instance = Instance::new(
@@ -72,10 +79,12 @@ impl VulkanRenderer {
         // Remember, cloning device just clones the Arc which is inexpensive.
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
 
-
+        // Please reference this https://vulkano.rs/03-buffer-creation/01-buffer-creation.html
+        let iter = (0..128).map(|_| 5u8);
+        self.create_uniform_buffer_from_iter(memory_allocator.clone(), iter)?;
 
         println!("Successfully created VulkanRenderer.");
 
-        Ok(VulkanRenderer {})
+        Ok(())
     }
 }
