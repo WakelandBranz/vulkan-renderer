@@ -3,25 +3,34 @@ mod tests;
 
 use std::sync::Arc;
 
-use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
-use vulkano::device::QueueFlags;
-use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
-use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
-use vulkano::memory::allocator::StandardMemoryAllocator;
-use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
-use vulkano::{VulkanLibrary, instance};
+use vulkano::{
+    VulkanLibrary,
+    command_buffer::allocator::{
+        StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
+    },
+    device::{Device, DeviceCreateInfo, Queue, QueueCreateInfo, QueueFlags},
+    instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
+    memory::allocator::StandardMemoryAllocator,
+};
 
-pub struct VulkanRenderer {}
+pub struct VulkanRenderer {
+    // Core Vulkan objects
+    pub(crate) instance: Arc<Instance>,
+    pub(crate) device: Arc<Device>,
+    pub(crate) queue: Arc<Queue>,
+
+    // Memory
+    pub(crate) memory_allocator: Arc<StandardMemoryAllocator>,
+    pub(crate) command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+}
 
 impl VulkanRenderer {
-    pub fn init() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(VulkanRenderer {})
-    }
-
     /*
-    TODO: Make setup take in window information to actually set up Vulkan for the window.
+    TODO!:
+    Make setup take in window information to actually set up Vulkan for the window.
+    Turn all prints into logs using a logging crate
     */
-    pub fn setup(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn init() -> Result<Self, Box<dyn std::error::Error>> {
         // The InstanceCreateFlags::ENUMERATE_PORTABILITY flag is set to support devices, such as those on MacOS and iOS systems, that do not fully conform to the Vulkan Specification
         let library = VulkanLibrary::new()?;
         let instance = Instance::new(
@@ -79,12 +88,38 @@ impl VulkanRenderer {
         // Remember, cloning device just clones the Arc which is inexpensive.
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
 
-        // Please reference this https://vulkano.rs/03-buffer-creation/01-buffer-creation.html
-        let iter = (0..128).map(|_| 5u8);
-        self.create_uniform_buffer_from_iter(memory_allocator.clone(), iter)?;
+        // https://docs.rs/vulkano/0.34.0/vulkano/command_buffer/allocator/trait.CommandBufferAllocator.html
+        // https://docs.rs/vulkano/0.34.0/vulkano/command_buffer/allocator/struct.StandardCommandBufferAllocator.html
+        // TODO!: read more about secondary command buffers which can be found below
+        // https://docs.rs/vulkano/0.34.0/vulkano/command_buffer/index.html
+        let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
+            device.clone(),
+            StandardCommandBufferAllocatorCreateInfo::default(),
+        ));
 
-        println!("Successfully created VulkanRenderer.");
+        /*
+        This is how to use command buffers. Use it when you render a frame.
+        Use CommandBufferUsage::OneTimeSubmit for dynamic frames, use CommandBufferUsage::MultipleSubmit for static things like UIs.
+        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
+            command_buffer_allocator.clone(),
+            queue_family_index,
+            CommandBufferUsage::OneTimeSubmit,
+        )?;
 
-        Ok(())
+        let command_buffer = Arc::new(command_buffer_builder.build()?);
+         */
+
+        println!("VulkanRenderer setup successful.");
+
+        Ok(VulkanRenderer {
+            // Core
+            instance,
+            device,
+            queue,
+
+            // Memory
+            memory_allocator,
+            command_buffer_allocator,
+        })
     }
 }
