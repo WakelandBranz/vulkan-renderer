@@ -4,9 +4,19 @@ mod tests {
 
     #[test]
     fn initialization_and_goofing_around() {
+        let sdl_context = sdl3::init().unwrap();
+        let video_subsystem = sdl_context.video().unwrap();
+
+        let window = video_subsystem
+            .window("rust-sdl3 demo", 800, 600)
+            .position_centered()
+            .vulkan()
+            .build()
+            .unwrap();
+
         // Setup
         let vulkan_renderer: VulkanRenderer =
-            VulkanRenderer::init().expect("Failed init Vulkan Renderer in tests");
+            VulkanRenderer::new(window).expect("Failed init Vulkan Renderer in tests");
 
         // Part where we have fun
 
@@ -27,7 +37,6 @@ mod tests {
         vulkan_renderer
             .create_destination_buffer_from_iter(destination_content)
             .expect("Failed to create uniform buffer from iter in test!");
-
 
         println!("ALL GOOD\nALL GOOD\nALL GOOD\n")
     }

@@ -5,8 +5,12 @@ edition = "2024"
 
 [dependencies]
 vulkano = "*"
-glam = "0.29"
+glam = "0.30.9"
 image = "0.25"
+raw-window-handle = "0.6.2"
+
+[dev-dependencies]
+sdl3 = "0.16.1"
 
 [profile.release]
 opt-level = 3

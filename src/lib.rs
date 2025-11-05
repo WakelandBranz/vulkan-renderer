@@ -1,8 +1,9 @@
-mod device;
+pub(crate) mod core;
 mod tests;
 
 use std::sync::Arc;
 
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use vulkano::{
     VulkanLibrary,
     command_buffer::allocator::{
@@ -30,7 +31,10 @@ impl VulkanRenderer {
     Make setup take in window information to actually set up Vulkan for the window.
     Turn all prints into logs using a logging crate
     */
-    pub fn init() -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new<W>(window: W) -> Result<Self, Box<dyn std::error::Error>>
+    where
+        W: HasDisplayHandle + HasWindowHandle,
+    {
         // The InstanceCreateFlags::ENUMERATE_PORTABILITY flag is set to support devices, such as those on MacOS and iOS systems, that do not fully conform to the Vulkan Specification
         let library = VulkanLibrary::new()?;
         let instance = Instance::new(
