@@ -12,6 +12,7 @@ use vulkano::{
     device::{Device, DeviceCreateInfo, Queue, QueueCreateInfo, QueueFlags},
     instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
     memory::allocator::StandardMemoryAllocator,
+    swapchain::Surface,
 };
 
 pub struct VulkanRenderer {
@@ -31,9 +32,14 @@ impl VulkanRenderer {
     Make setup take in window information to actually set up Vulkan for the window.
     Turn all prints into logs using a logging crate
     */
-    pub fn new<W>(window: W) -> Result<Self, Box<dyn std::error::Error>>
+    /// Creates a new Vulkan renderer.
+    /// 
+    /// # Safety
+    /// The window must outlive this renderer. Dropping the window before
+    /// the renderer causes undefined behavior.
+    pub fn new<W>(window: &W) -> Result<Self, Box<dyn std::error::Error>>
     where
-        W: HasDisplayHandle + HasWindowHandle,
+        W: HasWindowHandle + HasDisplayHandle,
     {
         // The InstanceCreateFlags::ENUMERATE_PORTABILITY flag is set to support devices, such as those on MacOS and iOS systems, that do not fully conform to the Vulkan Specification
         let library = VulkanLibrary::new()?;
@@ -44,6 +50,10 @@ impl VulkanRenderer {
                 ..Default::default()
             },
         )?;
+
+        unsafe {
+            let surface = Surface::from_window_ref(instance.clone(), window);
+        }
 
         // Find a physical device which we can use to render (iGPU, GeForce/Radeon graphics cards, etc.)
         let physical_device = instance
