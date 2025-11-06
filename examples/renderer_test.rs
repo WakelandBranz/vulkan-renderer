@@ -8,8 +8,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .position_centered()
         .vulkan()
         .build()?;
+
+    let window_size = window.size();
     
-    let vulkan_renderer = VulkanRenderer::new(&window)?;
+    let vulkan_renderer = VulkanRenderer::new(&window, window_size.into())?;
     
     // Keep window open
     let mut event_pump = sdl_context.event_pump()?;

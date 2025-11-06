@@ -10,17 +10,25 @@ use vulkano::{
     command_buffer::allocator::{
         StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
     },
-    device::{Device, DeviceCreateInfo, Queue, QueueCreateInfo, QueueFlags},
-    instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
+    device::{Device, Queue},
+    image::Image,
+    instance::Instance,
     memory::allocator::StandardMemoryAllocator,
-    swapchain::Surface,
+    render_pass::RenderPass,
+    swapchain::{Surface, Swapchain},
 };
+
+use crate::error::RendererError;
 
 pub struct VulkanRenderer {
     // Core Vulkan objects
     pub(crate) instance: Arc<Instance>,
+    pub(crate) surface: Arc<Surface>,
     pub(crate) device: Arc<Device>,
     pub(crate) queue: Arc<Queue>,
+    pub(crate) swapchain: Arc<Swapchain>,
+    pub(crate) images: Vec<Arc<Image>>,
+    pub(crate) render_pass: Arc<RenderPass>,
 
     // Memory
     pub(crate) memory_allocator: Arc<StandardMemoryAllocator>,
@@ -38,16 +46,19 @@ impl VulkanRenderer {
     /// # Safety
     /// The window must outlive this renderer. Dropping the window before
     /// the renderer causes undefined behavior.
-    pub fn new<W>(window: &W) -> Result<Self, Box<dyn std::error::Error>>
-    where
-        W: HasWindowHandle + HasDisplayHandle,
-    {
+    pub fn new(
+        window: &(impl HasWindowHandle + HasDisplayHandle),
+        window_size: [u32; 2],
+    ) -> Result<Self, RendererError> {
         let library = VulkanLibrary::new()?;
-        let instance = core::create_instance(library)?;
+        let instance = core::create_instance(library, window)?;
+        let surface = core::create_surface(instance.clone(), window)?;
         let physical_device = core::select_physical_device(instance.clone())?;
         let (device, queue) = core::create_device_and_queue(physical_device.clone())?;
-
+        let (swapchain, images) =
+            core::create_swapchain(device.clone(), surface.clone(), window_size)?;
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+        let render_pass = core::create_render_pass(device.clone(), swapchain.image_format())?;
 
         // https://docs.rs/vulkano/0.34.0/vulkano/command_buffer/allocator/trait.CommandBufferAllocator.html
         // https://docs.rs/vulkano/0.34.0/vulkano/command_buffer/allocator/struct.StandardCommandBufferAllocator.html
@@ -58,17 +69,7 @@ impl VulkanRenderer {
             StandardCommandBufferAllocatorCreateInfo::default(),
         ));
 
-        /*
-        This is how to use command buffers. Use it when you render a frame.
-        Use CommandBufferUsage::OneTimeSubmit for dynamic frames, use CommandBufferUsage::MultipleSubmit for static things like UIs.
-        let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
-            command_buffer_allocator.clone(),
-            queue_family_index,
-            CommandBufferUsage::OneTimeSubmit,
-        )?;
-
-        let command_buffer = Arc::new(command_buffer_builder.build()?);
-         */
+        // Reminder, B8G8R8A8_SRGB with SrgbNonLinear is the standard image format choice for most games.
 
         println!("VulkanRenderer setup successful.");
 
@@ -77,10 +78,25 @@ impl VulkanRenderer {
             instance,
             device,
             queue,
+            surface,
+            swapchain,
+            images,
+            render_pass,
 
             // Memory
             memory_allocator,
             command_buffer_allocator,
         })
+    }
+
+    /// Call this when window is resized
+    pub fn resize(&mut self, new_size: [u32; 2]) -> Result<(), RendererError> {
+        let (swapchain, images) =
+            core::create_swapchain(self.device.clone(), self.surface.clone(), new_size)?;
+
+        self.swapchain = swapchain;
+        self.images = images;
+
+        Ok(())
     }
 }

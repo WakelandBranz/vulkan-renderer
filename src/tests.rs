@@ -1,9 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use crate::VulkanRenderer;
-
     // SDL3 doesn't allow for windows to be instantiated in a test. 
     // All tests involving actually rendering to a window must be done in /examples/*
     #[test]

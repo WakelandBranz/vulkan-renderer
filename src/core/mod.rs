@@ -10,24 +10,35 @@ use std::sync::Arc;
 
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use vulkano::{
-    Validated, VulkanError, VulkanLibrary,
+    VulkanLibrary,
     device::{
-        Device, DeviceCreateInfo, Queue, QueueCreateInfo, QueueFlags, physical::PhysicalDevice,
+        Device, DeviceCreateInfo, DeviceExtensions, Queue, QueueCreateInfo, QueueFlags,
+        physical::PhysicalDevice,
     },
     format::Format,
-    image::Image,
+    image::{Image, ImageLayout, ImageUsage, SampleCount},
     instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
-    render_pass::RenderPass,
-    swapchain::{Surface, Swapchain},
+    render_pass::{
+        AttachmentDescription, AttachmentLoadOp, AttachmentReference, AttachmentStoreOp,
+        RenderPass, RenderPassCreateInfo, SubpassDependency, SubpassDescription,
+    },
+    swapchain::{ColorSpace, Surface, Swapchain, SwapchainCreateInfo},
+    sync::{AccessFlags, PipelineStages},
 };
 
 use crate::error::RendererError;
 
-pub(crate) fn create_instance(library: Arc<VulkanLibrary>) -> Result<Arc<Instance>, RendererError> {
+pub(crate) fn create_instance(
+    library: Arc<VulkanLibrary>,
+    window: &(impl HasWindowHandle + HasDisplayHandle),
+) -> Result<Arc<Instance>, RendererError> {
+    let required_extensions = Surface::required_extensions(window)?;
+
     Ok(Instance::new(
         library,
         InstanceCreateInfo {
             flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
+            enabled_extensions: required_extensions,
             ..Default::default()
         },
     )?)
@@ -80,11 +91,15 @@ pub(crate) fn create_device_and_queue(
                 queue_family_index,
                 ..Default::default()
             }],
+            enabled_extensions: DeviceExtensions {
+                khr_swapchain: true,
+                ..DeviceExtensions::empty()
+            },
             ..Default::default()
         },
     )?;
 
-    /* TODO: TURN THIS INTO A DEBUG LOG!!!!!!!!!! 
+    /* TODO: TURN THIS INTO A DEBUG LOG!!!!!!!!!!
     println!(
             "Successfully chosen device {:?} running driver {:?} with version {:?}",
             physical_device.properties().device_name,
@@ -100,19 +115,114 @@ pub(crate) fn create_device_and_queue(
     Ok((device, queue))
 }
 
+// Swapchain creation - use on resize!!!!!
 pub(crate) fn create_swapchain(
     device: Arc<Device>,
     surface: Arc<Surface>,
     window_size: [u32; 2],
 ) -> Result<(Arc<Swapchain>, Vec<Arc<Image>>), RendererError> {
-    // Swapchain creation - use on resize
-    todo!()
+    let physical_device = device.physical_device();
+
+    // Query what the surface supports
+    let surface_capabilities =
+        physical_device.surface_capabilities(&surface, Default::default())?;
+
+    // Select preferred format, if that fails get first available format.
+    let (image_format, image_color_space) = physical_device
+        .surface_formats(&surface, Default::default())?
+        .into_iter()
+        .find(|(format, color_space)| {
+            *format == Format::B8G8R8A8_SRGB && *color_space == ColorSpace::SrgbNonLinear
+        })
+        .or_else(|| {
+            physical_device
+                .surface_formats(&surface, Default::default())
+                .ok()?
+                .into_iter()
+                .next()
+        })
+        .ok_or(RendererError::NoSurfaceFormat)?;
+
+    let (swapchain, images) = Swapchain::new(
+        device,
+        surface,
+        SwapchainCreateInfo {
+            min_image_count: surface_capabilities.min_image_count.max(2),
+
+            image_format,
+            image_color_space,
+            image_extent: window_size,
+
+            image_usage: ImageUsage::COLOR_ATTACHMENT,
+
+            composite_alpha: surface_capabilities
+                .supported_composite_alpha
+                .into_iter()
+                .next()
+                .ok_or(RendererError::NoCompositeAlpha)?,
+
+            ..Default::default()
+        },
+    )?;
+
+    Ok((swapchain, images))
 }
 
+/// Creates a render pass for rendering directly to the swapchain.
 pub(crate) fn create_render_pass(
     device: Arc<Device>,
     format: Format,
 ) -> Result<Arc<RenderPass>, RendererError> {
-    // Render pass creation
-    todo!()
+    // https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Render_passes
+    let attachment = AttachmentDescription {
+        format,
+        samples: SampleCount::Sample1,
+        load_op: AttachmentLoadOp::Clear, // Clear the values to a constant at the start
+        store_op: AttachmentStoreOp::Store, // Rendered contents will be stored in memory and can be read later
+        initial_layout: ImageLayout::Undefined,
+        final_layout: ImageLayout::PresentSrc, // Ready for presentation
+        ..Default::default()
+    };
+
+    let subpass = SubpassDescription {
+        color_attachments: vec![Some(AttachmentReference {
+            attachment: 0,
+            layout: ImageLayout::ColorAttachmentOptimal,
+            ..Default::default()
+        })],
+        ..Default::default()
+    };
+
+    let dependencies = vec![
+        // Dependency from external to this subpass
+        SubpassDependency {
+            src_subpass: None, // External
+            dst_subpass: Some(0),
+            src_stages: PipelineStages::COLOR_ATTACHMENT_OUTPUT,
+            dst_stages: PipelineStages::COLOR_ATTACHMENT_OUTPUT,
+            src_access: AccessFlags::empty(),
+            dst_access: AccessFlags::COLOR_ATTACHMENT_WRITE,
+            ..Default::default()
+        },
+        // Dependency from this subpass to external (presentation)
+        SubpassDependency {
+            src_subpass: Some(0),
+            dst_subpass: None, // External
+            src_stages: PipelineStages::COLOR_ATTACHMENT_OUTPUT,
+            dst_stages: PipelineStages::BOTTOM_OF_PIPE,
+            src_access: AccessFlags::COLOR_ATTACHMENT_WRITE,
+            dst_access: AccessFlags::empty(),
+            ..Default::default()
+        },
+    ];
+
+    Ok(RenderPass::new(
+        device,
+        RenderPassCreateInfo {
+            attachments: vec![attachment],
+            subpasses: vec![subpass],
+            dependencies,
+            ..Default::default()
+        },
+    )?)
 }
