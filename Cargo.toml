@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 vulkano = "*"
-glam = "0.30.9"
+thiserror = "2.0.17"
 image = "0.25"
 raw-window-handle = "0.6.2"
 
