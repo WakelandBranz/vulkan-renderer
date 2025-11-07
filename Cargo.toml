@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 vulkano = "*"
+vulkano-shaders = {version = "*", features = ["shaderc-build-from-source"]}
 thiserror = "2.0.17"
 image = "0.25"
 raw-window-handle = "0.6.2"

@@ -1,6 +1,7 @@
 pub(crate) mod batch;
 pub(crate) mod device;
 pub(crate) mod pipeline;
+pub(crate) mod shaders;
 pub(crate) mod swapchain;
 pub(crate) mod sync;
 pub(crate) mod texture;
