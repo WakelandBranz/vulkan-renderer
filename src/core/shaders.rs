@@ -30,6 +30,9 @@ mod vs {
             }
         ",
     }
+}
+
+mod fs {
     vulkano_shaders::shader! {
         ty: "fragment",
         src: r"
@@ -48,12 +51,14 @@ mod vs {
 
 pub struct Shaders {
     pub vs: Arc<ShaderModule>,
+    pub fs: Arc<ShaderModule>,
 }
 
 impl Shaders {
     pub fn load(device: Arc<Device>) -> Result<Self, RendererError> {
         Ok(Self {
-            vs: (vs::load(device)?),
+            vs: (vs::load(device.clone())?),
+            fs: (fs::load(device.clone())?),
         })
     }
 }

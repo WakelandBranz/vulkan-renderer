@@ -18,7 +18,7 @@ use vulkano::{
     swapchain::{Surface, Swapchain},
 };
 
-use crate::error::RendererError;
+use crate::{core::shaders, error::RendererError};
 
 pub struct VulkanRenderer {
     // Core Vulkan objects
@@ -59,6 +59,8 @@ impl VulkanRenderer {
             core::create_swapchain(device.clone(), surface.clone(), window_size)?;
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
         let render_pass = core::create_render_pass(device.clone(), swapchain.image_format())?;
+
+        let shaders = shaders::Shaders::load(device.clone())?;
         
 
         // https://docs.rs/vulkano/0.34.0/vulkano/command_buffer/allocator/trait.CommandBufferAllocator.html
